@@ -8,6 +8,10 @@ add_executable(1_hello_cuda 1_hello_cuda.cu)
 add_executable(2_indexing 2_indexing.cu)
 add_executable(3_vector_add 3_vector_add.cu)
 add_executable(4_device_query 4_device_query.cu)
+add_executable(5_1_reduce_baseline 5_1_reduce_baseline.cu)
+add_executable(5_2_reduce_v0 5_2_reduce_v0.cu)
+add_executable(5_3_reduce_v1 5_3_reduce_v1.cu)
+
 
 set_target_properties(AIComputeLabs_GPU PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON)
