@@ -15,24 +15,57 @@
  * @param d_in
  * @param d_out
  */
+
+//v4: 最后一个warp不用参与__syncthreads
+//latency: 0.694ms
+__device__ void WarpSharedMemReduce(volatile float* smem, int tid){
+    // CUDA不保证所有的shared memory读操作都能在写操作之前完成，因此存在竞争关系，可能导致结果错误
+    // 比如smem[tid] += smem[tid + 16] => smem[0] += smem[16], smem[16] += smem[32]
+    // 此时L9中smem[16]的读和写到底谁在前谁在后，这是不确定的，所以在Volta架构后最后加入中间寄存器(L11)配合syncwarp和volatile(使得不会看见其他线程更新smem上的结果)保证读写依赖
+    float x = smem[tid];
+    if (blockDim.x >= 64) {
+        x += smem[tid + 32]; __syncwarp();
+        smem[tid] = x; __syncwarp();
+    }
+    x += smem[tid + 16]; __syncwarp();
+    smem[tid] = x; __syncwarp();
+    x += smem[tid + 8]; __syncwarp();
+    smem[tid] = x; __syncwarp();
+    x += smem[tid + 4]; __syncwarp();
+    smem[tid] = x; __syncwarp();
+    x += smem[tid + 2]; __syncwarp();
+    smem[tid] = x; __syncwarp();
+    x += smem[tid + 1]; __syncwarp();
+    smem[tid] = x; __syncwarp();
+}
+
 template<int blockSize>
-__global__ void reduce_v0(const float *d_in, float *d_out) {
-    __shared__ float shared_memory[blockSize];
+__global__ void reduce_v4(float *d_in, float *d_out){
+    __shared__ float smem[blockSize];
+    // 泛指当前线程在其block内的id
     unsigned int tid = threadIdx.x;
-    int global_tid = blockIdx.x * blockSize + threadIdx.x;
+    // 泛指当前线程在所有block范围内的全局id
+    unsigned int gtid = blockIdx.x * (blockSize * 2) + threadIdx.x;
     // load: 每个线程加载一个元素到shared mem对应位置
-    shared_memory[tid] = d_in[global_tid];
-    // 涉及到shared memory的读写最好都加上__sync threads
+    smem[tid] = d_in[gtid] + d_in[gtid + blockSize];
     __syncthreads();
-    for (int index = 1; index < blockDim.x; index *= 2) {
-        if ((tid & (2 * index - 1)) == 0) {
-            shared_memory[tid] += shared_memory[tid + index];
+
+    // 基于v3改进：把最后一个warp抽离出来reduce，避免多做一次sync threads
+    // 此时一个block对d_in这块数据的reduce sum结果保存在id为0的线程上面
+    for (unsigned int index = blockDim.x / 2; index > 32; index >>= 1) {
+        if (tid < index) {
+            smem[tid] += smem[tid + index];
         }
         __syncthreads();
     }
 
+    // last warp拎出来单独做reduce
+    if (tid < 32) {
+        WarpSharedMemReduce(smem, tid);
+    }
+    // store: 哪里来回哪里去，把reduce结果写回显存
     if (tid == 0) {
-        d_out[blockIdx.x] = shared_memory[0];
+        d_out[blockIdx.x] = smem[0];
     }
 }
 
@@ -72,12 +105,12 @@ int main() {
     cudaMemcpy(d_a, a, N * sizeof(float), cudaMemcpyHostToDevice);
     // 定义分配的block数量和threads数量
     dim3 Grid(GridSize);
-    dim3 Block(BlockSize);
+    dim3 Block(BlockSize / 2);
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
-    reduce_v0<BlockSize><<<Grid,Block>>>(d_a, d_out);
+    reduce_v4<BlockSize / 2><<<Grid,Block>>>(d_a, d_out);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&millie_seconds, start, stop);
@@ -91,7 +124,7 @@ int main() {
         printf("the ans is wrong\n");
         printf("groudtruth is: %f \n", ground_truth);
     }
-    printf("reduce_v1 latency = %f ms\n", millie_seconds);
+    printf("reduce_v2 latency = %f ms\n", millie_seconds);
 
     cudaFree(d_a);
     cudaFree(d_out);

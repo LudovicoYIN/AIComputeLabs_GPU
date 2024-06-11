@@ -16,23 +16,28 @@
  * @param d_out
  */
 template<int blockSize>
-__global__ void reduce_v0(const float *d_in, float *d_out) {
-    __shared__ float shared_memory[blockSize];
+__global__ void reduce_v3(float *d_in, float *d_out){
+    __shared__ float smem[blockSize];
+    // 泛指当前线程在其block内的id
     unsigned int tid = threadIdx.x;
-    int global_tid = blockIdx.x * blockSize + threadIdx.x;
+    // 泛指当前线程在所有block范围内的全局id
+    unsigned int gtid = blockIdx.x * (blockSize * 2) + threadIdx.x;
     // load: 每个线程加载一个元素到shared mem对应位置
-    shared_memory[tid] = d_in[global_tid];
-    // 涉及到shared memory的读写最好都加上__sync threads
+    smem[tid] = d_in[gtid] + d_in[gtid + blockSize];
     __syncthreads();
-    for (int index = 1; index < blockDim.x; index *= 2) {
-        if ((tid & (2 * index - 1)) == 0) {
-            shared_memory[tid] += shared_memory[tid + index];
+
+    // 基于v1作出改进: 从之前的当前线程ID加2*线程ID位置然后不断加上*2位置上的数据，改成不断地对半相加，以消除bank conflict
+    // 此时一个block对d_in这块数据的reduce sum结果保存在id为0的线程上面
+    for (unsigned int index = blockDim.x / 2; index > 0; index >>= 1) {
+        if (tid < index) {
+            smem[tid] += smem[tid + index];
         }
         __syncthreads();
     }
 
+    // store: 哪里来回哪里去，把reduce结果写回显存
     if (tid == 0) {
-        d_out[blockIdx.x] = shared_memory[0];
+        d_out[blockIdx.x] = smem[0];
     }
 }
 
@@ -72,12 +77,12 @@ int main() {
     cudaMemcpy(d_a, a, N * sizeof(float), cudaMemcpyHostToDevice);
     // 定义分配的block数量和threads数量
     dim3 Grid(GridSize);
-    dim3 Block(BlockSize);
+    dim3 Block(BlockSize / 2);
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
-    reduce_v0<BlockSize><<<Grid,Block>>>(d_a, d_out);
+    reduce_v3<BlockSize / 2><<<Grid,Block>>>(d_a, d_out);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&millie_seconds, start, stop);
@@ -91,7 +96,7 @@ int main() {
         printf("the ans is wrong\n");
         printf("groudtruth is: %f \n", ground_truth);
     }
-    printf("reduce_v1 latency = %f ms\n", millie_seconds);
+    printf("reduce_v2 latency = %f ms\n", millie_seconds);
 
     cudaFree(d_a);
     cudaFree(d_out);

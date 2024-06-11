@@ -11,7 +11,9 @@ add_executable(4_device_query 4_device_query.cu)
 add_executable(5_1_reduce_baseline 5_1_reduce_baseline.cu)
 add_executable(5_2_reduce_v0 5_2_reduce_v0.cu)
 add_executable(5_3_reduce_v1 5_3_reduce_v1.cu)
+add_executable(5_4_reduce_v2 5_4_reduce_v2.cu)
+add_executable(5_5_reduce_v3 5_5_reduce_v3.cu)
+add_executable(5_6_reduce_v4 5_6_reduce_v4.cu)
 
 
-set_target_properties(AIComputeLabs_GPU PROPERTIES
-        CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(AIComputeLabs_GPU PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
