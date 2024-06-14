@@ -2,6 +2,13 @@
 #include "cuda_runtime.h"
 #include <iostream>
 
+/**
+ * reduce算法的baseline方法，也就是一个线程去做，和传统的方法一致
+ * @param input
+ * @param output
+ * @param n
+ */
+
 __global__ void reduce_baseline(const int* input, int* output, size_t n) {
     int sum = 0;
     for (size_t i = 0; i < n; ++i) {

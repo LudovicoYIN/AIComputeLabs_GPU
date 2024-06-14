@@ -14,6 +14,8 @@ add_executable(5_3_reduce_v1 5_3_reduce_v1.cu)
 add_executable(5_4_reduce_v2 5_4_reduce_v2.cu)
 add_executable(5_5_reduce_v3 5_5_reduce_v3.cu)
 add_executable(5_6_reduce_v4 5_6_reduce_v4.cu)
+add_executable(5_7_reduce_v5 5_7_reduce_v5.cu)
+add_executable(5_8_reduce_v6 5_8_reduce_v6.cu)
 
 
 set_target_properties(AIComputeLabs_GPU PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

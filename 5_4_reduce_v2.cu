@@ -2,18 +2,12 @@
 #include "cuda_runtime.h"
 #include <iostream>
 /**
- * 总体思路：和v0一致，但是将位运算代替取余操作，取余操作耗时较大
- * 其中0和其他值按位与操作都是0
- * 提取低位 (tid & 掩码)6
- * 掩码的生成：
-    掩码 (2 * index - 1) 生成一个低位为全 1、高位为 0 的二进制数。
-    当 index = n 时，2 * n - 1 会生成一个二进制数，它的低 n 位是 1。例如：
-    index = 1，2 * 1 - 1 = 1，二进制 0001
-    index = 2，2 * 2 - 1 = 3，二进制 0011
-    index = 3，2 * 3 - 1 = 7，二进制 0111
+ * 总体思路：和v1一致，只不过减少了bank conflict
+ * 也就是说不是相邻两位去加了，而是隔了一半的距离
  * @tparam blockSize                                                                                                                    
  * @param d_in
  * @param d_out
+ * time latency: 0.79ms
  */
 template<int blockSize>
 __global__ void reduce_v2(float *d_in, float *d_out){

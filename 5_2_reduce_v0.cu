@@ -7,6 +7,7 @@
  * @tparam blockSize
  * @param d_in
  * @param d_out
+ * time latency: 1.14ms
  */
 template<int blockSize>
 __global__ void reduce_v0(const float *d_in, float *d_out) {

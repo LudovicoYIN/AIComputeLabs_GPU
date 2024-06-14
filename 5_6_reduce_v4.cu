@@ -2,18 +2,11 @@
 #include "cuda_runtime.h"
 #include <iostream>
 /**
- * 总体思路：和v0一致，但是将位运算代替取余操作，取余操作耗时较大
- * 其中0和其他值按位与操作都是0
- * 提取低位 (tid & 掩码)6
- * 掩码的生成：
-    掩码 (2 * index - 1) 生成一个低位为全 1、高位为 0 的二进制数。
-    当 index = n 时，2 * n - 1 会生成一个二进制数，它的低 n 位是 1。例如：
-    index = 1，2 * 1 - 1 = 1，二进制 0001
-    index = 2，2 * 2 - 1 = 3，二进制 0011
-    index = 3，2 * 3 - 1 = 7，二进制 0111
+ * 总体思路：和v3思想一致，就是最后一个warp的线程单独拎出来计算，减少了一次__syncthreads，这个操作较为耗时
  * @tparam blockSize                                                                                                                    
  * @param d_in
  * @param d_out
+ * time latency: 0.33ms
  */
 
 //v4: 最后一个warp不用参与__syncthreads
